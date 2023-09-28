@@ -15,18 +15,15 @@ hour: str = "10"
 month: str = "2"
 year: str = "2023"
 limit: int = 2 # min is 2
-chromeDriverPath = "/Users/blancgoat/Developer/chromedriver_mac_arm64/chromedriver"
 
-driver = webdriver.Chrome(chromeDriverPath)
+driver = webdriver.Chrome()
 driver.implicitly_wait(4)
 driver.get("https://www.letskorail.com/korail/com/login.do")
 driver.find_element("name", "txtMember").send_keys(memberShipNo)
 driver.find_element("name", "txtPwd").send_keys(password)
 driver.find_element("xpath", "//img[@src ='/images/btn_login.gif']").click()
 
-time.sleep(1)
-driver.switch_to.window(driver.window_handles[1])
-driver.close()
+
 driver.switch_to.window(driver.window_handles[0])
 
 driver.get("https://www.letskorail.com/ebizprd/EbizPrdTicketpr21100W_pr21110.do")
@@ -50,12 +47,13 @@ if hour is not None:
 
 driver.find_elements(By.CLASS_NAME, "btn_inq")[0].click()
 
-time.sleep(2)
+time.sleep(1)
 i = 1
 
 while True:
     if i == limit:
         i = 1
+        time.sleep(1)
         driver.refresh()
 
     try:
@@ -74,3 +72,8 @@ while True:
         print(i)
         os.system('say "문제가 발생했을수도 있으니, 크롬엔진은 확인하여 주세요."')
         continue
+
+
+while True:
+    print("대기중")
+    time.sleep(1)
