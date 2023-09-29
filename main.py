@@ -14,7 +14,8 @@ day: str = "4"
 hour: str = "10"
 month: str = "2"
 year: str = "2023"
-limit: int = 2 # min is 2
+limit: int = 1 # min is 1
+isSloppy: bool = False # 입석+좌석 도 선택할지 여부, false면 입석+좌석은 선택하지않음
 
 driver = webdriver.Chrome()
 driver.implicitly_wait(4)
@@ -48,10 +49,12 @@ if hour is not None:
 driver.find_elements(By.CLASS_NAME, "btn_inq")[0].click()
 
 time.sleep(1)
-i = 1
+i = 0
 
 while True:
-    if i == limit:
+    i += 1
+
+    if i == limit + 1:
         i = 1
         time.sleep(1)
         driver.refresh()
@@ -61,11 +64,16 @@ while True:
 
         if len(ele.find_elements(By.XPATH, ".//*")) == 1:
             print(str(i) + "매진")
-            i += 1
             continue
         else:
-            ele.find_element("name", "btnRsv1_" + str(i - 1)).click()
-            os.system('say "케이티엑스 발권이 완료되었습니다. 결제를 진행하여 주세요."')
+            try:
+                ele.find_element("name", "btnRsv1_" + str(i - 1)).click()
+            except NoSuchElementException:
+                if isSloppy:
+                    ele.find_element("name", "btnRsv8_" + str(i - 1)).click()
+                else:
+                    print(str(i) + "입좌석스킵")
+                    continue
             break
     except NoSuchElementException:
         print("nope")
@@ -73,7 +81,15 @@ while True:
         os.system('say "문제가 발생했을수도 있으니, 크롬엔진은 확인하여 주세요."')
         continue
 
+# 안내메세지 팝업뜰때가 있는데 그때 처리용
+time.sleep(1)
+try:
+    driver.switch_to.frame("embeded-modal-traininfo")
+    driver.find_elements(By.CLASS_NAME, "pop_close")[0].click()
+except NoSuchElementException:
+    pass
 
+os.system('say "케이티엑스 발권이 완료되었습니다. 결제를 진행하여 주세요."')
 while True:
     print("대기중")
-    time.sleep(1)
+    time.sleep(10)
