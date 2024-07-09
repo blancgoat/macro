@@ -51,30 +51,47 @@ while True:
         })(XMLHttpRequest.prototype.open);
     """)
 
-    # 무한 새로고침 while # TODO 간헐적으로 프론트동작이이상함 해당스케줄에 영화관이없다는 알럿이 나올때가있음 이는 ajax에서 에러났는데 200처리된것으로 예상됨 프론트오류나면 전체로직을 continue할 필요있을듯
-    isNotWhile = False
-    while not isNotWhile:
-        time.sleep(0.5)
-        driver.execute_script("window.initXHRCount();")
-        wait.until(EC.element_to_be_clickable(dateButton)).click()
-        try:
-            wait.until(lambda d: d.execute_script("return window.activeXHRs === 0"))
-        except TimeoutException:
-            print("타임아웃 발생")
-            continue
+    # 무한 새로고침 while #
+    try:
+        isNotWhile = False
+        while not isNotWhile:
+            time.sleep(0.5)
+            driver.execute_script("window.initXHRCount();")
+            wait.until(EC.element_to_be_clickable(dateButton)).click()
+            try:
+                wait.until(lambda d: d.execute_script("return window.activeXHRs === 0"))
+            except TimeoutException:
+                print(f"ajax timeout 발생, 차단가능성있음: {datetime.now()}")
+                continue
 
-        for i in range(0, 5):
-            button = driver.find_element(By.CLASS_NAME, "section-time").find_element(By.CSS_SELECTOR, f'li[data-index="{i}"]')
-            isNotWhile = button.get_attribute("class") != "disabled"
-            if isNotWhile:
-                button.click()
-                driver.find_element(By.ID, "tnb_step_btn_right").click()
-                break
-    # 진입성공
-    # 나이제한 팝업 TODO 이거뜰때도있고 안뜰때있는거처리 및 우선순위 낮출필요있음[해당 처리로직동안 순위밀림]
-    wait.until(EC.element_to_be_clickable((
-        By.CSS_SELECTOR, '[class="ft_layer_popup popup_alert popup_previewGradeInfo ko"] .ft .btn_red')
-    )).click()
+            # 여기서 시간대 선택이 가능함, 단순하게 설계하긴했으나 시제품이아닌이상 굳이..
+            for i in range(0, 5):
+                button = driver.find_element(By.CLASS_NAME, "section-time").find_element(By.CSS_SELECTOR, f'li[data-index="{i}"]')
+                isNotWhile = button.get_attribute("class") != "disabled"
+                if isNotWhile:
+                    wait.until(EC.element_to_be_clickable(button)).click()
+                    driver.find_element(By.ID, "tnb_step_btn_right").click()
+                    break
+    except UnexpectedAlertPresentException as e:
+        print(f"왜 알럿발생을하지: {e}: {datetime.now()}")
+        try:
+            driver.switch_to.alert.accept()
+        except:
+            pass
+        finally:
+            continue
+    except Exception as e:
+        print(f"뭔 에러여: {e}: {datetime.now()}")
+        continue
+
+    # 진입성공 #
+    # step2 페이지가 visiable 됬는지 확인
+    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[class="step step2"]')))
+
+    # 여러가지상황에(나이제한팝업등) 따라 blackscreen 이 발생할 수 있다. 모든상황에서 blackscreen을 제거
+    blackscreen = driver.find_element(By.ID, "blackscreen")
+    if blackscreen.is_displayed():
+        driver.execute_script("arguments[0].style.display = 'none';", blackscreen)
 
     # 성인한명 클릭
     driver.find_element(By.ID, "nop_group_adult").find_element(By.CSS_SELECTOR, f'li[data-count="1"]').click()
@@ -88,14 +105,30 @@ while True:
         continue
 
     # 결제페이지 진입
+    submitButton = driver.find_element(By.ID, "tnb_step_btn_right")
     try:
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#tnb_step_btn_right.on"))).click()
     # 시트선택까진했으나 결제진입단계에서 패배
     except UnexpectedAlertPresentException as e:
         print(f"패배: {e}: {datetime.now()}")
-        continue
+        try:
+            driver.switch_to.alert.accept()
+        except:
+            pass
+        finally:
+            continue
 
     break
+
+# 나이제한 팝업
+try:
+    redButton = driver.find_element(By.CSS_SELECTOR, '[class="ft_layer_popup popup_alert popup_previewGradeInfo ko"] .ft .btn_red')
+    if redButton.is_displayed() and redButton.is_enabled():
+        redButton.click()
+except NoSuchElementException:
+    pass
+except : # 개억까 방지용 결제페이지가 눈앞에있는데 별거아닌걸로 브라우저 닫히면 자살할듯
+    pass
 
 os.system('say "떳다"')
 
