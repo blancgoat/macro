@@ -76,10 +76,12 @@ WebDriverWait(driver, 10).until(
 
 driver.find_element(By.ID, "nop_group_adult").find_element(By.CSS_SELECTOR, f'li[data-count="1"]').click()
 driver.find_element(By.ID, "seats_list").find_element(By.CSS_SELECTOR, ".seat:not([class*=' '])").click()
-time.sleep(1)
-WebDriverWait(driver, 10).until(
-    EC.element_to_be_clickable(driver.find_element(By.ID, "tnb_step_btn_right"))
-).click()
+try:
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "#tnb_step_btn_right.on"))
+    ).click()
+except TimeoutException:
+    os.system('say "졌다 마케다 오이오이 다시켜라구"')
 
 os.system('say "떳다"')
 
