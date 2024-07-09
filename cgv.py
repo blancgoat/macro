@@ -1,8 +1,11 @@
 # coding=utf-8
 import time
 import os
+from datetime import datetime
+
 from selenium import webdriver
 from selenium.common import TimeoutException
+from selenium.common.exceptions import NoSuchElementException, UnexpectedAlertPresentException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
@@ -28,9 +31,7 @@ driver.switch_to.frame("ticket_iframe")
 time.sleep(2)
 driver.find_element(By.CSS_SELECTOR, f'li[theater_cd="{theater_cd}"]').click()
 time.sleep(2)
-x = driver.find_element(By.CSS_SELECTOR, f'li[date="{date}"]')
-x.click()
-time.sleep(2)
+dateButton = driver.find_element(By.CSS_SELECTOR, f'li[date="{date}"]')
 
 driver.execute_script("""
     window.activeXHRs = 0;
@@ -49,12 +50,13 @@ driver.execute_script("""
 """)
 
 isNotWhile = False
+wait = WebDriverWait(driver, 10)
 while not isNotWhile:
     time.sleep(0.5)
     driver.execute_script("window.initXHRCount();")
-    x.click()
+    wait.until(EC.element_to_be_clickable(dateButton)).click()
     try:
-        WebDriverWait(driver, 10).until(
+        wait.until(
             lambda d: d.execute_script("return window.activeXHRs === 0")
         )
     except TimeoutException:
@@ -69,19 +71,20 @@ while not isNotWhile:
             driver.find_element(By.ID, "tnb_step_btn_right").click()
             break
 
-WebDriverWait(driver, 10).until(
-    EC.element_to_be_clickable((By.CSS_SELECTOR,
-                                '[class="ft_layer_popup popup_alert popup_previewGradeInfo ko"] .ft .btn_red'))
-).click()
+wait.until(EC.element_to_be_clickable((
+    By.CSS_SELECTOR, '[class="ft_layer_popup popup_alert popup_previewGradeInfo ko"] .ft .btn_red')
+)).click()
 
 driver.find_element(By.ID, "nop_group_adult").find_element(By.CSS_SELECTOR, f'li[data-count="1"]').click()
-driver.find_element(By.ID, "seats_list").find_element(By.CSS_SELECTOR, ".seat:not([class*=' '])").click()
 try:
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "#tnb_step_btn_right.on"))
-    ).click()
-except TimeoutException:
-    os.system('say "졌다 마케다 오이오이 다시켜라구"')
+    driver.find_element(By.ID, "seats_list").find_element(By.CSS_SELECTOR, ".seat:not([class*=' '])").click() # 들어왔는데 seat가 없을수도있음
+except NoSuchElementException as e:
+    print(f"패배: {e}: {datetime.now()}")
+
+try:
+    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#tnb_step_btn_right.on"))).click()
+except UnexpectedAlertPresentException as e:
+    print(f"패배: {e}: {datetime.now()}")
 
 os.system('say "떳다"')
 
