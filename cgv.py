@@ -1,9 +1,11 @@
 # coding=utf-8
 import time
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
-from seleniumwire import webdriver
 import os
+from selenium import webdriver
+from selenium.common import TimeoutException
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.common.by import By
 
 # param
 id = "id"
@@ -48,14 +50,18 @@ driver.execute_script("""
 
 isNotWhile = False
 while not isNotWhile:
-    time.sleep(1)
+    time.sleep(0.5)
     driver.execute_script("window.initXHRCount();")
     x.click()
-    WebDriverWait(driver, 10).until(
-        lambda d: d.execute_script("return window.activeXHRs === 0")
-    )
+    try:
+        WebDriverWait(driver, 10).until(
+            lambda d: d.execute_script("return window.activeXHRs === 0")
+        )
+    except TimeoutException:
+        print("타임아웃 발생")
+        continue
 
-    for i in range(2, 5):
+    for i in range(0, 5):
         button = driver.find_element(By.CLASS_NAME, "section-time").find_element(By.CSS_SELECTOR, f'li[data-index="{i}"]')
         isNotWhile = button.get_attribute("class") != "disabled"
         if isNotWhile:
@@ -63,11 +69,17 @@ while not isNotWhile:
             driver.find_element(By.ID, "tnb_step_btn_right").click()
             break
 
-driver.implicitly_wait(4)
-driver.switch_to.frame("proxy_iframe")
-driver.find_element(By.CLASS_NAME, "btn btn_ok btn_red").click()
-driver.switch_to.default_content()
+WebDriverWait(driver, 10).until(
+    EC.element_to_be_clickable((By.CSS_SELECTOR,
+                                '[class="ft_layer_popup popup_alert popup_previewGradeInfo ko"] .ft .btn_red'))
+).click()
+
 driver.find_element(By.ID, "nop_group_adult").find_element(By.CSS_SELECTOR, f'li[data-count="1"]').click()
+driver.find_element(By.ID, "seats_list").find_element(By.CSS_SELECTOR, ".seat:not([class*=' '])").click()
+time.sleep(1)
+WebDriverWait(driver, 10).until(
+    EC.element_to_be_clickable(driver.find_element(By.ID, "tnb_step_btn_right"))
+).click()
 
 os.system('say "떳다"')
 
