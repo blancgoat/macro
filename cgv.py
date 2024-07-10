@@ -9,6 +9,7 @@ from selenium.common.exceptions import NoSuchElementException, UnexpectedAlertPr
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 
 # param
 id = "id"
@@ -62,6 +63,30 @@ def check_xhr_status(second: int=1):
             last_zero_time = None
 
         time.sleep(0.1)
+
+def click_until_change(button_element: WebElement, target_element: WebElement, timeout: int = 30) -> bool:
+    """
+    버튼을 눌러서 타켓엘레먼트가 변경될때까지 계속 클릭해주는 함수
+    :param button_element:
+    :param target_element:
+    :param timeout:
+    :return: 변경성공시 Ture, Timeout까지 변경실패시 False
+    """
+    original_content = target_element.text
+
+    def element_changed():
+        return target_element.text != original_content
+
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        button_element.click()
+        try:
+            WebDriverWait(button_element.parent, 1).until(lambda _: element_changed())
+            return True
+        except TimeoutException:
+            continue
+
+    return False
 
 
 '''로그인'''
@@ -145,9 +170,16 @@ while True:
         continue
 
     # 결제페이지 진입
-    submitButton = driver.find_element(By.ID, "tnb_step_btn_right")
     try:
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#tnb_step_btn_right.on"))).click()
+        '''
+        clickable이랑 css변경체크까지 확인해도 함수가 동작은하는데 아무동작안하는 함수일때도있다.
+        아마 특정 form값 변경을 만족해야하는것 같은데 그값이 뭔지 알방법이없다.
+        어쩔수없이 step3로 이동할때까지 무한클릭하는 함수를 적용했다
+        '''
+        click_until_change(
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#tnb_step_btn_right.on"))),
+            step_frame3
+        )
     # 시트선택까진했으나 결제진입단계에서 패배
     except UnexpectedAlertPresentException as e:
         print(f"패배: {e}: {datetime.now()}")
