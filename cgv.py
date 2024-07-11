@@ -39,7 +39,7 @@ def initialize_xhr_monitoring():
         })(XMLHttpRequest.prototype.open);
     """)
 
-def check_xhr_status(second: int=1):
+def check_xhr_status(second: int):
     """
     second까지 pending XHR이 전부 사라지는지 확인합니다.
     second까지는 무조건 대기하고있는게 특징입니다. XHR이 pending인게 계속 있다면 무한루프가 발생할 수 도 있습니다.
@@ -108,7 +108,7 @@ while True:
     한번 done상태가됨 그래서 1초이내에 xhr이 pending 이 유지되고있는지 확인하는식으로 처리
     사실 이렇게 복잡하게 할필요없고 쿨하게 time.sleep걸어주는게 현명할것같다.
     '''
-    check_xhr_status()
+    check_xhr_status(2)
 
     wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'li[theater_cd="{theater_cd}"]'))).click()
 
@@ -153,10 +153,11 @@ while True:
     # step2 페이지가 visiable 됬는지 확인
     wait.until(EC.visibility_of(step_frame2))
 
-    # 여러가지상황에(나이제한팝업등) 따라 blackscreen 이 발생할 수 있다. 모든상황에서 blackscreen을 제거
-    blackscreen = driver.find_element(By.ID, "blackscreen")
-    if blackscreen.is_displayed():
-        driver.execute_script("arguments[0].style.display = 'none';", blackscreen)
+    # 나이제한 팝업제거
+    # 해당팝업로드 기다리면서 왠만한 프론트로직이 로드완료됨 이쪽이 훨씬 안정성이 좋아 해당 코드를 부활
+    wait.until(EC.element_to_be_clickable((
+        By.CSS_SELECTOR, '[class="ft_layer_popup popup_alert popup_previewGradeInfo ko"] .ft .btn_red')
+    )).click()
 
     # 성인한명 클릭
     driver.find_element(By.ID, "nop_group_adult").find_element(By.CSS_SELECTOR, f'li[data-count="1"]').click()
@@ -164,10 +165,9 @@ while True:
     # 시트 클릭
     try:
         driver.find_element(By.ID, "seats_list").find_element(By.CSS_SELECTOR, ".seat:not([class*=' '])").click()
-    # 들어왔는데 seat가 없을수도있음
-    except NoSuchElementException as e:
-        print(f"패배: {e}: {datetime.now()}")
-        continue
+    # 간혹 활성화시트가없는데도 들어와지는 케이스가존재
+    except Exception as e:
+        print(f"시트선택 패배: {e}: {datetime.now()}")
 
     # 결제페이지 진입
     try:
@@ -182,7 +182,7 @@ while True:
         )
     # 시트선택까진했으나 결제진입단계에서 패배
     except UnexpectedAlertPresentException as e:
-        print(f"패배: {e}: {datetime.now()}")
+        print(f"결제진입 패배: {e}: {datetime.now()}")
         try:
             driver.switch_to.alert.accept()
         except:
@@ -191,16 +191,6 @@ while True:
             continue
 
     break
-
-# 나이제한 팝업
-try:
-    red_button = driver.find_element(By.CSS_SELECTOR, '[class="ft_layer_popup popup_alert popup_previewGradeInfo ko"] .ft .btn_red')
-    if red_button.is_displayed() and red_button.is_enabled():
-        red_button.click()
-except NoSuchElementException:
-    pass
-except : # 개억까 방지용 결제페이지가 눈앞에있는데 별거아닌걸로 브라우저 닫히면 자살할듯
-    pass
 
 os.system('say "떳다"')
 
