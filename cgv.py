@@ -5,25 +5,31 @@ from datetime import datetime
 
 from selenium import webdriver
 from selenium.common import TimeoutException
-from selenium.common.exceptions import NoSuchElementException, UnexpectedAlertPresentException
+from selenium.common.exceptions import UnexpectedAlertPresentException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
-# param
-id = "id"
-password = "PassW@rd"
-movie_url = "https://www.cgv.co.kr/ticket/?MOVIE_CD=20037219&MOVIE_CD_GROUP=20036657"
-date = "20240720" # yyyyMMdd
-theater_cd = "0013" # 상영관 코드
+# constant
+REFRESH_INTERVAL = 0.3
+LOGIN_CHECK_INTERVAL = 100
+DRIVER = webdriver.Chrome()
+WAIT = WebDriverWait(DRIVER, 10)
 
-driver = webdriver.Chrome()
-wait = WebDriverWait(driver, 10)
+# param
+param = {
+    'id': 'id',
+    'password': 'PassW@rd',
+    'movie_url': 'https://www.cgv.co.kr/ticket/?MOVIE_CD=20037219&MOVIE_CD_GROUP=20036657',
+    'date': '20240720',  # yyyyMMdd
+    'theater_cd': '0013',  # 상영관 코드
+}
+
 
 def initialize_xhr_monitoring():
     """XHR 갯수파악 함수를 초기화합니다. activeXHRs 라는 변수명을 공유하기 위해 함수로 사용"""
-    driver.execute_script("""
+    DRIVER.execute_script("""
         window.activeXHRs = 0;
         window.initXHRCount = function() {
             window.activeXHRs = 0;
@@ -39,6 +45,7 @@ def initialize_xhr_monitoring():
         })(XMLHttpRequest.prototype.open);
     """)
 
+
 def check_xhr_status(second: int):
     """
     second까지 pending XHR이 전부 사라지는지 확인합니다.
@@ -50,7 +57,7 @@ def check_xhr_status(second: int):
 
     while True:
         try:
-            wait.until(lambda d: d.execute_script("return window.activeXHRs === 0"))
+            WAIT.until(lambda d: d.execute_script('return window.activeXHRs === 0'))
 
             if last_zero_time is None:
                 last_zero_time = time.time()
@@ -59,10 +66,11 @@ def check_xhr_status(second: int):
         except TimeoutException:
             last_zero_time = None
 
-        if driver.execute_script("return window.activeXHRs > 0"):
+        if DRIVER.execute_script('return window.activeXHRs > 0'):
             last_zero_time = None
 
         time.sleep(0.1)
+
 
 def click_until_change(button_element: WebElement, target_element: WebElement, timeout: int = 30) -> bool:
     """
@@ -79,7 +87,7 @@ def click_until_change(button_element: WebElement, target_element: WebElement, t
 
     start_time = time.time()
     while time.time() - start_time < timeout:
-        button_element.click()
+        WAIT.until(EC.element_to_be_clickable(button_element)).click()
         try:
             WebDriverWait(button_element.parent, 1).until(lambda _: element_changed())
             return True
@@ -89,18 +97,40 @@ def click_until_change(button_element: WebElement, target_element: WebElement, t
     return False
 
 
+def try_login():
+    main_window = DRIVER.current_window_handle
+    DRIVER.execute_script("window.open('');")
+    DRIVER.switch_to.window(DRIVER.window_handles[-1])
+
+    DRIVER.get('https://www.cgv.co.kr/user/login/default.aspx')
+    DRIVER.find_element(By.ID, 'txtUserId').send_keys(param['id'])
+    DRIVER.find_element(By.ID, 'txtPassword').send_keys(param['password'])
+    DRIVER.find_element(By.ID, 'submit').click()
+
+    DRIVER.close()
+    DRIVER.switch_to.window(main_window)
+
+
+def is_logged_in() -> bool:
+    cookie = DRIVER.get_cookie('cgv.cookie')
+    if cookie:
+        if 'expiry' in cookie:
+            expiry_time = datetime.fromtimestamp(cookie['expiry'])
+            return expiry_time > datetime.now()
+        else: # 만료 시간이 없는케이스
+            return True
+    return False
+
+
 '''로그인'''
-driver.implicitly_wait(4)
-driver.get("https://www.cgv.co.kr/user/login/default.aspx")
-driver.find_element(By.ID, "txtUserId").send_keys(id)
-driver.find_element(By.ID, "txtPassword").send_keys(password)
-driver.find_element(By.ID, "submit").click()
+DRIVER.implicitly_wait(4)
+try_login()
 
 while True:
     '''얘매페이지 접근'''
-    driver.get(movie_url)
-    iframe = wait.until(EC.presence_of_element_located((By.ID, "ticket_iframe")))
-    driver.switch_to.frame(iframe)
+    DRIVER.get(param['movie_url'])
+    iframe = WAIT.until(EC.presence_of_element_located((By.ID, 'ticket_iframe')))
+    DRIVER.switch_to.frame(iframe)
 
     initialize_xhr_monitoring()
     '''
@@ -110,64 +140,79 @@ while True:
     '''
     check_xhr_status(2)
 
-    wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'li[theater_cd="{theater_cd}"]'))).click()
+    WAIT.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'li[theater_cd="{param['theater_cd']}"]'))).click()
 
-    date_button = driver.find_element(By.CSS_SELECTOR, f'li[date="{date}"]')
-    step_frame2 = driver.find_element(By.CSS_SELECTOR, '[class="step step2"]')
-    step_frame3 = driver.find_element(By.CSS_SELECTOR, '[class="step step3"]')
+    date_button = DRIVER.find_element(By.CSS_SELECTOR, f'li[date="{param['date']}"]')
+    step_frame2 = DRIVER.find_element(By.CSS_SELECTOR, '[class="step step2"]')
+    step_frame3 = DRIVER.find_element(By.CSS_SELECTOR, '[class="step step3"]')
 
     '''무한 새로고침 while'''
+    iteration_count = 0
     try:
         is_not_while = False
         while not is_not_while:
-            time.sleep(0.5)
-            driver.execute_script("window.initXHRCount();")
-            wait.until(EC.element_to_be_clickable(date_button)).click()
+            # 새로고침주기설정, 너무빠르면 차단먹을수도?
+            time.sleep(REFRESH_INTERVAL)
+            iteration_count += 1
+
+            # 주기당 로그인 만료 체크로직
+            if iteration_count % LOGIN_CHECK_INTERVAL == 0:
+                iteration_count = 0
+                if not is_logged_in():
+                    try_login()
+                    print('try login again')
+                else:
+                    print('session still alive')
+
+            # 클릭시 백엔드 로드시간++
+            DRIVER.execute_script('window.initXHRCount();')
+            WAIT.until(EC.element_to_be_clickable(date_button)).click()
             try:
-                wait.until(lambda d: d.execute_script("return window.activeXHRs === 0"))
+                WAIT.until(lambda d: d.execute_script('return window.activeXHRs === 0'))
             except TimeoutException:
-                print(f"ajax timeout 발생, 차단가능성있음: {datetime.now()}")
+                print(f'ajax timeout 발생, 차단가능성있음: {datetime.now()}')
                 continue
 
             # 여기서 시간대 선택이 가능함, 단순하게 설계하긴했으나 시제품이아닌이상 굳이..
-            for i in range(0, 5):
-                button = driver.find_element(By.CLASS_NAME, "section-time").find_element(By.CSS_SELECTOR, f'li[data-index="{i}"]')
-                is_not_while = button.get_attribute("class") != "disabled"
+            for i in range(2, 5):
+                button = (DRIVER.find_element(By.CLASS_NAME, 'section-time')
+                          .find_element(By.CSS_SELECTOR, f'li[data-index="{i}"]'))
+                is_not_while = button.get_attribute('class') != 'disabled'
                 if is_not_while:
-                    wait.until(EC.element_to_be_clickable(button)).click()
-                    driver.find_element(By.ID, "tnb_step_btn_right").click()
+                    WAIT.until(EC.element_to_be_clickable(button)).click()
+                    DRIVER.find_element(By.ID, 'tnb_step_btn_right').click()
                     break
     except UnexpectedAlertPresentException as e:
-        print(f"왜 알럿발생을하지: {e}: {datetime.now()}")
+        print(f'왜 알럿발생을하지: {datetime.now()}: {e}')
         try:
-            driver.switch_to.alert.accept()
+            DRIVER.switch_to.alert.accept()
         except:
             pass
         finally:
             continue
     except Exception as e:
-        print(f"뭔 에러여: {e}: {datetime.now()}")
+        print(f'뭔 에러여: {datetime.now()}: {e}')
         continue
 
     '''진입성공'''
     # step2 페이지가 visiable 됬는지 확인
-    wait.until(EC.visibility_of(step_frame2))
+    WAIT.until(EC.visibility_of(step_frame2))
 
     # 나이제한 팝업제거
     # 해당팝업로드 기다리면서 왠만한 프론트로직이 로드완료됨 이쪽이 훨씬 안정성이 좋아 해당 코드를 부활
-    wait.until(EC.element_to_be_clickable((
+    WAIT.until(EC.element_to_be_clickable((
         By.CSS_SELECTOR, '[class="ft_layer_popup popup_alert popup_previewGradeInfo ko"] .ft .btn_red')
     )).click()
 
     # 성인한명 클릭
-    driver.find_element(By.ID, "nop_group_adult").find_element(By.CSS_SELECTOR, f'li[data-count="1"]').click()
+    DRIVER.find_element(By.ID, "nop_group_adult").find_element(By.CSS_SELECTOR, f'li[data-count="1"]').click()
 
     # 시트 클릭
     try:
-        driver.find_element(By.ID, "seats_list").find_element(By.CSS_SELECTOR, ".seat:not([class*=' '])").click()
+        DRIVER.find_element(By.ID, "seats_list").find_element(By.CSS_SELECTOR, ".seat:not([class*=' '])").click()
     # 간혹 활성화시트가없는데도 들어와지는 케이스가존재
     except Exception as e:
-        print(f"시트선택 패배: {e}: {datetime.now()}")
+        print(f'시트선택 패배: {datetime.now()} : {e}')
 
     # 결제페이지 진입
     try:
@@ -177,14 +222,14 @@ while True:
         어쩔수없이 step3로 이동할때까지 무한클릭하는 함수를 적용했다
         '''
         click_until_change(
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#tnb_step_btn_right.on"))),
+            WAIT.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#tnb_step_btn_right.on'))),
             step_frame3
         )
     # 시트선택까진했으나 결제진입단계에서 패배
     except UnexpectedAlertPresentException as e:
-        print(f"결제진입 패배: {e}: {datetime.now()}")
+        print(f'결제진입 패배: {datetime.now()}: {e}')
         try:
-            driver.switch_to.alert.accept()
+            DRIVER.switch_to.alert.accept()
         except:
             pass
         finally:
