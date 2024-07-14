@@ -13,7 +13,6 @@ from selenium.webdriver.remote.webelement import WebElement
 
 # constant
 REFRESH_INTERVAL = 0.3
-LOGIN_CHECK_INTERVAL = 100
 DRIVER = webdriver.Chrome()
 WAIT = WebDriverWait(DRIVER, 10)
 
@@ -111,13 +110,12 @@ def try_login():
     DRIVER.switch_to.window(main_window)
 
 
-def is_logged_in() -> bool:
+def get_cookie_expiry_or_status() -> bool | int:
     cookie = DRIVER.get_cookie('cgv.cookie')
     if cookie:
         if 'expiry' in cookie:
-            expiry_time = datetime.fromtimestamp(cookie['expiry'])
-            return expiry_time > datetime.now()
-        else: # 만료 시간이 없는케이스
+            return cookie['expiry']
+        else:
             return True
     return False
 
@@ -147,22 +145,23 @@ while True:
     step_frame3 = DRIVER.find_element(By.CSS_SELECTOR, '[class="step step3"]')
 
     '''무한 새로고침 while'''
-    iteration_count = 0
+    is_not_while = False
+    expiry = get_cookie_expiry_or_status()
     try:
-        is_not_while = False
         while not is_not_while:
             # 새로고침주기설정, 너무빠르면 차단먹을수도?
             time.sleep(REFRESH_INTERVAL)
-            iteration_count += 1
 
-            # 주기당 로그인 만료 체크로직
-            if iteration_count % LOGIN_CHECK_INTERVAL == 0:
-                iteration_count = 0
-                if not is_logged_in():
-                    try_login()
-                    print('try login again')
+            # 로그인 만료 체크로직
+            if (isinstance(expiry, int) and expiry < time.time()) or expiry is False:
+                try_login()
+                expiry = get_cookie_expiry_or_status()
+                try:
+                    expiry_datetime = datetime.fromtimestamp(expiry)
+                except TypeError:
+                    print('WTF')
                 else:
-                    print('session still alive')
+                    print(f'Session expired, try login again: Renewal time {expiry_datetime}')
 
             # 클릭시 백엔드 로드시간++
             DRIVER.execute_script('window.initXHRCount();')
@@ -170,7 +169,7 @@ while True:
             try:
                 WAIT.until(lambda d: d.execute_script('return window.activeXHRs === 0'))
             except TimeoutException:
-                print(f'ajax timeout 발생, 차단가능성있음: {datetime.now()}')
+                print(f'ajax timeout, 차단가능성있음: {datetime.now()}')
                 continue
 
             # 여기서 시간대 선택이 가능함, 단순하게 설계하긴했으나 시제품이아닌이상 굳이..
