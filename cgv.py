@@ -97,7 +97,7 @@ def click_until_change(button_element: WebElement, target_element: WebElement, t
     return False
 
 
-def try_login():
+def try_login() -> bool | int:
     main_window = DRIVER.current_window_handle
     DRIVER.execute_script("window.open('');")
     DRIVER.switch_to.window(DRIVER.window_handles[-1])
@@ -107,8 +107,12 @@ def try_login():
     DRIVER.find_element(By.ID, 'txtPassword').send_keys(param['password'])
     DRIVER.find_element(By.ID, 'submit').click()
 
+    expire = get_cookie_expiry_or_status()
+
     DRIVER.close()
     DRIVER.switch_to.window(main_window)
+
+    return expire
 
 
 def get_cookie_expiry_or_status() -> bool | int:
@@ -123,7 +127,7 @@ def get_cookie_expiry_or_status() -> bool | int:
 
 '''로그인'''
 DRIVER.implicitly_wait(4)
-try_login()
+expire_time = try_login()
 
 while True:
     '''얘매페이지 접근'''
@@ -144,22 +148,21 @@ while True:
 
     '''무한 새로고침 while'''
     is_not_while = False
-    expiry = get_cookie_expiry_or_status()
     try:
         while not is_not_while:
             # 새로고침주기설정, 너무빠르면 차단먹을수도?
             time.sleep(REFRESH_INTERVAL)
 
             # 로그인 만료 체크로직
-            if (isinstance(expiry, int) and expiry < time.time()) or expiry is False:
-                try_login()
-                expiry = get_cookie_expiry_or_status()
-                try:
-                    expiry_datetime = datetime.fromtimestamp(expiry)
-                except TypeError:
-                    print('WTF')
+            if (isinstance(expire_time, int) and expire_time < time.time() + 1) or expire_time is False:
+                expire_time = try_login()
+
+                if isinstance(expire_time, int):
+                    print(f'Session expired, try login again. Renewal time: {datetime.fromtimestamp(expire_time)}')
+                elif expire_time is True:
+                    pass
                 else:
-                    print(f'Session expired, try login again: Renewal time {expiry_datetime}')
+                    raise Exception('로그인했는데 로그인못했음?')
 
             # 클릭시 백엔드 로드시간++
             DRIVER.execute_script('window.initXHRCount();')
