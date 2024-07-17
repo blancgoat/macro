@@ -127,8 +127,7 @@ try_login()
 while True:
     '''얘매페이지 접근'''
     DRIVER.get(param['movie_url'])
-    iframe = WAIT.until(EC.presence_of_element_located((By.ID, 'ticket_iframe')))
-    DRIVER.switch_to.frame(iframe)
+    DRIVER.switch_to.frame(WAIT.until(EC.presence_of_element_located((By.ID, 'ticket_iframe'))))
 
     initialize_xhr_monitoring()
     '''
@@ -141,8 +140,6 @@ while True:
     WAIT.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'li[theater_cd="{param['theater_cd']}"]'))).click()
 
     date_button = DRIVER.find_element(By.CSS_SELECTOR, f'li[date="{param['date']}"]')
-    step_frame2 = DRIVER.find_element(By.CSS_SELECTOR, '[class="step step2"]')
-    step_frame3 = DRIVER.find_element(By.CSS_SELECTOR, '[class="step step3"]')
 
     '''무한 새로고침 while'''
     is_not_while = False
@@ -173,7 +170,7 @@ while True:
                 continue
 
             # 여기서 시간대 선택이 가능함, 단순하게 설계하긴했으나 시제품이아닌이상 굳이..
-            for i in range(2, 5):
+            for i in [2, 4]:
                 button = (DRIVER.find_element(By.CLASS_NAME, 'section-time')
                           .find_element(By.CSS_SELECTOR, f'li[data-index="{i}"]'))
                 is_not_while = button.get_attribute('class') != 'disabled'
@@ -181,21 +178,13 @@ while True:
                     WAIT.until(EC.element_to_be_clickable(button)).click()
                     DRIVER.find_element(By.ID, 'tnb_step_btn_right').click()
                     break
-    except UnexpectedAlertPresentException as e:
-        print(f'왜 알럿발생을하지: {datetime.now()}: {e}')
-        try:
-            DRIVER.switch_to.alert.accept()
-        except:
-            pass
-        finally:
-            continue
     except Exception as e:
         print(f'뭔 에러여: {datetime.now()}: {e}')
         continue
 
     '''진입성공'''
     # step2 페이지가 visiable 됬는지 확인
-    WAIT.until(EC.visibility_of(step_frame2))
+    WAIT.until(EC.visibility_of(DRIVER.find_element(By.CSS_SELECTOR, '[class="step step2"]')))
 
     # 나이제한 팝업제거
     # 해당팝업로드 기다리면서 왠만한 프론트로직이 로드완료됨 이쪽이 훨씬 안정성이 좋아 해당 코드를 부활
@@ -222,17 +211,12 @@ while True:
         '''
         click_until_change(
             WAIT.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#tnb_step_btn_right.on'))),
-            step_frame3
+            DRIVER.find_element(By.CSS_SELECTOR, '[class="step step3"]')
         )
     # 시트선택까진했으나 결제진입단계에서 패배
     except UnexpectedAlertPresentException as e:
         print(f'결제진입 패배: {datetime.now()}: {e}')
-        try:
-            DRIVER.switch_to.alert.accept()
-        except:
-            pass
-        finally:
-            continue
+        continue
 
     break
 
