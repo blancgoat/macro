@@ -72,27 +72,24 @@ def check_xhr_status(second: int):
         time.sleep(0.1)
 
 
-def click_until_change(button_element: WebElement, target_element: WebElement, timeout: int = 30) -> bool:
+def click_until_visible(button_element: WebElement, visible_element: WebElement, timeout: int) -> bool:
     """
-    버튼을 눌러서 타켓엘레먼트가 변경될때까지 계속 클릭해주는 함수
+    버튼을 눌러서 특정엘레먼트가 보일때까지 계속 클릭해주는 함수
     :param button_element:
-    :param target_element:
+    :param visible_element:
     :param timeout:
     :return: 변경성공시 Ture, Timeout까지 변경실패시 False
     """
-    original_content = target_element.text
-
-    def element_changed():
-        return target_element.text != original_content
 
     start_time = time.time()
     while time.time() - start_time < timeout:
-        WAIT.until(EC.element_to_be_clickable(button_element)).click()
         try:
-            WebDriverWait(button_element.parent, 1).until(lambda _: element_changed())
+            WAIT.until(EC.element_to_be_clickable(button_element)).click()
+        except Exception:
+            pass
+
+        if visible_element.is_displayed():
             return True
-        except TimeoutException:
-            continue
 
     return False
 
@@ -213,10 +210,9 @@ while True:
         아마 특정 form값 변경을 만족해야하는것 같은데 그값이 뭔지 알방법이없다.
         어쩔수없이 step3로 이동할때까지 무한클릭하는 함수를 적용했다
         '''
-        click_until_change(
-            WAIT.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#tnb_step_btn_right.on'))),
-            DRIVER.find_element(By.CSS_SELECTOR, '[class="step step3"]')
-        )
+        click_until_visible(WAIT.until(EC.presence_of_element_located((By.CSS_SELECTOR, '#tnb_step_btn_right.on'))),
+                            DRIVER.find_element(By.CSS_SELECTOR, '[class="step step3"]'),
+                            5)
     # 시트선택까진했으나 결제진입단계에서 패배
     except UnexpectedAlertPresentException as e:
         print(f'결제진입 패배: {datetime.now()}: {e}')
