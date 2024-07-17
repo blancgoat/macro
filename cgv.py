@@ -22,6 +22,7 @@ param = {
     'password': 'PassW@rd',
     'movie_url': 'https://www.cgv.co.kr/ticket/?MOVIE_CD=20037219&MOVIE_CD_GROUP=20036657',
     'date': '20240720',  # yyyyMMdd
+    'theater_area': '2',  # 상영관 지역 리스트에서 몇번째인지, 주로 2가 서울임
     'theater_cd': '0013',  # 상영관 코드
 }
 
@@ -137,8 +138,8 @@ while True:
     '''
     check_xhr_status(2)
 
+    WAIT.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'#theater_area_list > ul > li:nth-child({param['theater_area']})'))).click()
     WAIT.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f'li[theater_cd="{param['theater_cd']}"]'))).click()
-
     date_button = DRIVER.find_element(By.CSS_SELECTOR, f'li[date="{param['date']}"]')
 
     '''무한 새로고침 while'''
