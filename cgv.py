@@ -95,21 +95,12 @@ def click_until_visible(button_element: WebElement, visible_element: WebElement,
 
 
 def try_login() -> bool | int:
-    main_window = DRIVER.current_window_handle
-    DRIVER.execute_script("window.open('');")
-    DRIVER.switch_to.window(DRIVER.window_handles[-1])
-
     DRIVER.get('https://www.cgv.co.kr/user/login/default.aspx')
     DRIVER.find_element(By.ID, 'txtUserId').send_keys(param['id'])
     DRIVER.find_element(By.ID, 'txtPassword').send_keys(param['password'])
     DRIVER.find_element(By.ID, 'submit').click()
 
-    expire = get_cookie_expiry_or_status()
-
-    DRIVER.close()
-    DRIVER.switch_to.window(main_window)
-
-    return expire
+    return get_cookie_expiry_or_status()
 
 
 def get_cookie_expiry_or_status() -> bool | int:
@@ -151,13 +142,13 @@ while True:
             time.sleep(REFRESH_INTERVAL)
 
             # 로그인 만료 체크로직
-            if (isinstance(expire_time, int) and expire_time < time.time() + 1) or expire_time is False:
+            if (isinstance(expire_time, int) and expire_time < time.time() + 5) or expire_time is False:
                 expire_time = try_login()
 
                 if isinstance(expire_time, int):
-                    print(f'Session expired, try login again. Renewal time: {datetime.fromtimestamp(expire_time)}')
+                    raise Exception(f'Session expired, try login again. Renewal time: {datetime.fromtimestamp(expire_time)}')
                 elif expire_time is True:
-                    pass
+                    raise Exception('cgv에서는 이런케이스가 없어야하는데..')
                 else:
                     raise Exception('로그인했는데 로그인못했음?')
 
@@ -180,7 +171,7 @@ while True:
                     DRIVER.find_element(By.ID, 'tnb_step_btn_right').click()
                     break
     except Exception as e:
-        print(f'뭔 에러여: {datetime.now()}: {e}')
+        print(f'무한 새로고침 while중 catch: {datetime.now()}: {e}')
         continue
 
     '''진입성공'''
