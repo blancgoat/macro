@@ -193,6 +193,7 @@ while True:
     # 간혹 활성화시트가없는데도 들어와지는 케이스가존재
     except Exception as e:
         print(f'시트선택 패배: {datetime.now()} : {e}')
+        continue
 
     # 결제페이지 진입
     try:
