@@ -1,8 +1,10 @@
 # coding=utf-8
 import time
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import os
 
 # param
@@ -60,7 +62,9 @@ while True:
         driver.refresh()
 
     try:
-        ele = driver.find_element(By.ID, "tableResult").find_element(By.XPATH, "//tbody/tr[" + str(i) + "]/td[6]")
+        ele = WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.XPATH, f"//table[@id='tableResult']//tbody/tr[{i}]/td[6]"))
+        )
 
         if len(ele.find_elements(By.XPATH, ".//*")) == 1:
             print(str(i) + "매진")
@@ -79,6 +83,9 @@ while True:
         print("nope")
         print(i)
         os.system('say "문제가 발생했을수도 있으니, 크롬엔진은 확인하여 주세요."')
+        continue
+    except TimeoutException:
+        print(f"30초 동안 요소를 찾지 못했습니다: tr[{i}]/td[6]")
         continue
 
 # 안내메세지 팝업뜰때가 있는데 그때 처리용
