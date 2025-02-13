@@ -68,16 +68,18 @@ def click_until_visible(page: Page, button_selector: str, visible_selector: str,
         page.wait_for_timeout(100)
     return False
 
-def try_login(page: Page) -> bool | int:
+def try_login(page: Page) -> bool | float:
     """로그인을 시도하고 쿠키 만료 시간을 반환합니다."""
     page.goto('https://www.cgv.co.kr/user/login/default.aspx')
-    page.fill('#txtUserId', param['id'])
-    page.fill('#txtPassword', param['password'])
-    page.click('#submit')
+
+    if page.url == 'https://www.cgv.co.kr/user/login/default.aspx':
+        page.fill('#txtUserId', param['id'])
+        page.fill('#txtPassword', param['password'])
+        page.click('#submit')
 
     return get_cookie_expiry_or_status(page)
 
-def get_cookie_expiry_or_status(page: Page) -> bool | int:
+def get_cookie_expiry_or_status(page: Page) -> float | int:
     """쿠키 상태를 확인합니다."""
     cookies = page.context.cookies()
     for cookie in cookies:
@@ -116,10 +118,9 @@ def main():
                     page.wait_for_timeout(REFRESH_INTERVAL * 1000)
 
                     # 로그인 만료 체크
-                    if (isinstance(expire_time, int) and expire_time < time.time()) or expire_time is False:
+                    if expire_time is False or expire_time < time.time():
                         expire_time = try_login(page)
-                        if isinstance(expire_time, int):
-                            raise Exception(f'Session expired, try login again. Renewal time: {datetime.fromtimestamp(expire_time)}')
+                        raise Exception(f'Session expired, try login again. Renewal time: {datetime.fromtimestamp(expire_time)}')
 
                     # 날짜 선택
                     frame.evaluate('window.initXHRCount()')
